@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { queryClient } from "@/lib/queryClient";
 
 // Icons
 import { 
@@ -23,8 +24,13 @@ export default function Sidebar({ currentPath }: SidebarProps) {
   const [_, navigate] = useLocation();
 
   const handleLogout = async () => {
-    await logoutMutation.mutateAsync();
-    navigate("/auth");
+    try {
+      await logoutMutation.mutateAsync();
+      queryClient.clear(); // Clear all React Query cache
+      navigate("/auth");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   return (

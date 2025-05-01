@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,14 +11,20 @@ import Logs from "@/pages/logs";
 import Templates from "@/pages/templates";
 import Settings from "@/pages/settings";
 import AuthPage from "@/pages/auth-page";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 
 function Router() {
   const [location] = useLocation();
+  const { user, isLoading } = useAuth();
   
   // Check if the current route is the auth page
   const isAuthPage = location === "/auth";
+  
+  // If user is authenticated and on auth page, redirect to dashboard
+  if (user && isAuthPage) {
+    return <Redirect to="/" />;
+  }
   
   // If we're on the auth page, don't show the sidebar
   if (isAuthPage) {
@@ -30,6 +36,11 @@ function Router() {
         </Switch>
       </div>
     );
+  }
+  
+  // If user is not authenticated and not on auth page, redirect to auth page
+  if (!user && !isLoading && !isAuthPage) {
+    return <Redirect to="/auth" />;
   }
   
   // For all other routes, show the sidebar

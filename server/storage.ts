@@ -12,8 +12,17 @@ import {
   RateLimit,
   InsertRateLimit,
   BotSettings,
-  InsertBotSettings
+  InsertBotSettings,
+  users,
+  discordGuilds,
+  messageTemplates,
+  campaigns,
+  messageLog,
+  rateLimits,
+  botSettings
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -306,4 +315,315 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// DatabaseStorage implementation using Drizzle ORM
+export class DatabaseStorage implements IStorage {
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  // Discord Guild operations
+  async getGuilds(): Promise<DiscordGuild[]> {
+    return await db.select().from(discordGuilds);
+  }
+
+  async getGuild(id: string): Promise<DiscordGuild | undefined> {
+    const [guild] = await db.select().from(discordGuilds).where(eq(discordGuilds.id, id));
+    return guild || undefined;
+  }
+
+  async createGuild(guild: InsertDiscordGuild): Promise<DiscordGuild> {
+    const [newGuild] = await db.insert(discordGuilds).values(guild).returning();
+    return newGuild;
+  }
+
+  async updateGuild(id: string, guild: Partial<DiscordGuild>): Promise<DiscordGuild | undefined> {
+    const [updatedGuild] = await db
+      .update(discordGuilds)
+      .set(guild)
+      .where(eq(discordGuilds.id, id))
+      .returning();
+    return updatedGuild || undefined;
+  }
+
+  async deleteGuild(id: string): Promise<boolean> {
+    const result = await db.delete(discordGuilds).where(eq(discordGuilds.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Message Template operations
+  async getTemplates(): Promise<MessageTemplate[]> {
+    return await db.select().from(messageTemplates);
+  }
+
+  async getTemplate(id: number): Promise<MessageTemplate | undefined> {
+    const [template] = await db.select().from(messageTemplates).where(eq(messageTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createTemplate(template: InsertMessageTemplate): Promise<MessageTemplate> {
+    const now = new Date();
+    const [newTemplate] = await db
+      .insert(messageTemplates)
+      .values({
+        ...template,
+        createdAt: now
+      })
+      .returning();
+    return newTemplate;
+  }
+
+  async updateTemplate(id: number, template: Partial<MessageTemplate>): Promise<MessageTemplate | undefined> {
+    const [updatedTemplate] = await db
+      .update(messageTemplates)
+      .set(template)
+      .where(eq(messageTemplates.id, id))
+      .returning();
+    return updatedTemplate || undefined;
+  }
+
+  async deleteTemplate(id: number): Promise<boolean> {
+    const result = await db.delete(messageTemplates).where(eq(messageTemplates.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Campaign operations
+  async getCampaigns(): Promise<Campaign[]> {
+    return await db.select().from(campaigns);
+  }
+
+  async getCampaign(id: number): Promise<Campaign | undefined> {
+    const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, id));
+    return campaign || undefined;
+  }
+
+  async getCampaignsByStatus(status: string): Promise<Campaign[]> {
+    return await db.select().from(campaigns).where(eq(campaigns.status, status));
+  }
+
+  async createCampaign(campaign: InsertCampaign): Promise<Campaign> {
+    const now = new Date();
+    const [newCampaign] = await db
+      .insert(campaigns)
+      .values({
+        ...campaign,
+        messagesSent: 0,
+        messagesQueued: 0,
+        messagesFailed: 0,
+        startedAt: campaign.status === 'running' ? now : null,
+        completedAt: null,
+        createdAt: now
+      })
+      .returning();
+    return newCampaign;
+  }
+
+  async updateCampaign(id: number, campaign: Partial<Campaign>): Promise<Campaign | undefined> {
+    // Handle status transitions
+    if (campaign.status) {
+      const [existing] = await db.select().from(campaigns).where(eq(campaigns.id, id));
+      
+      if (existing) {
+        if (campaign.status === 'running' && existing.status !== 'running') {
+          campaign.startedAt = new Date();
+        } else if (campaign.status === 'completed' && existing.status !== 'completed') {
+          campaign.completedAt = new Date();
+        }
+      }
+    }
+
+    const [updatedCampaign] = await db
+      .update(campaigns)
+      .set(campaign)
+      .where(eq(campaigns.id, id))
+      .returning();
+    return updatedCampaign || undefined;
+  }
+
+  async deleteCampaign(id: number): Promise<boolean> {
+    const result = await db.delete(campaigns).where(eq(campaigns.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Message Log operations
+  async getLogs(limit?: number): Promise<MessageLog[]> {
+    const query = db.select().from(messageLog).orderBy(desc(messageLog.timestamp));
+    if (limit) {
+      query.limit(limit);
+    }
+    return await query;
+  }
+
+  async getLogsByCampaign(campaignId: number, limit?: number): Promise<MessageLog[]> {
+    const query = db
+      .select()
+      .from(messageLog)
+      .where(eq(messageLog.campaignId, campaignId))
+      .orderBy(desc(messageLog.timestamp));
+    
+    if (limit) {
+      query.limit(limit);
+    }
+    
+    return await query;
+  }
+
+  async createLog(log: InsertMessageLog): Promise<MessageLog> {
+    const now = new Date();
+    const [newLog] = await db
+      .insert(messageLog)
+      .values({
+        ...log,
+        timestamp: now
+      })
+      .returning();
+    return newLog;
+  }
+
+  // Rate Limit operations
+  async getRateLimit(): Promise<RateLimit | undefined> {
+    const [rateLimit] = await db.select().from(rateLimits);
+    return rateLimit || undefined;
+  }
+
+  async updateRateLimit(rateLimit: InsertRateLimit): Promise<RateLimit> {
+    // Check if any rate limits exist
+    const existingRateLimits = await db.select().from(rateLimits);
+    const now = new Date();
+    
+    if (existingRateLimits.length === 0) {
+      // Create new rate limit
+      const [newRateLimit] = await db
+        .insert(rateLimits)
+        .values({
+          ...rateLimit,
+          updatedAt: now
+        })
+        .returning();
+      return newRateLimit;
+    } else {
+      // Update existing rate limit
+      const [updatedRateLimit] = await db
+        .update(rateLimits)
+        .set({
+          ...rateLimit,
+          updatedAt: now
+        })
+        .where(eq(rateLimits.id, existingRateLimits[0].id))
+        .returning();
+      return updatedRateLimit;
+    }
+  }
+
+  // Bot Settings operations
+  async getBotSettings(): Promise<BotSettings | undefined> {
+    const [settings] = await db.select().from(botSettings);
+    return settings || undefined;
+  }
+
+  async updateBotSettings(settings: Partial<BotSettings>): Promise<BotSettings | undefined> {
+    // Check if bot settings exist
+    const existingSettings = await db.select().from(botSettings);
+    const now = new Date();
+    
+    if (existingSettings.length === 0) {
+      // Create new bot settings
+      const [newSettings] = await db
+        .insert(botSettings)
+        .values({
+          id: 1,
+          status: settings.status || 'offline',
+          token: settings.token || null,
+          lastConnectedAt: settings.lastConnectedAt || null,
+          updatedAt: now
+        })
+        .returning();
+      return newSettings;
+    } else {
+      // Update existing bot settings
+      const [updatedSettings] = await db
+        .update(botSettings)
+        .set({
+          ...settings,
+          updatedAt: now
+        })
+        .where(eq(botSettings.id, existingSettings[0].id))
+        .returning();
+      return updatedSettings;
+    }
+  }
+
+  // Initialize default data
+  async initializeDefaults() {
+    // Check if templates exist
+    const templates = await db.select().from(messageTemplates);
+    if (templates.length === 0) {
+      // Add sample templates
+      await db.insert(messageTemplates).values([
+        {
+          name: 'Welcome Message',
+          content: 'Hey @username, welcome to our Discord server! 👋 We\'re glad to have you join our community. Check out our #rules and #announcements channels to get started. If you have any questions, feel free to ask in #help.',
+          createdAt: new Date()
+        },
+        {
+          name: 'Event Announcement',
+          content: 'Hello @username! We\'re hosting an event this weekend in our Discord server. Don\'t miss out! Check the #events channel for more details.',
+          createdAt: new Date()
+        },
+        {
+          name: 'Giveaway Notification',
+          content: 'Hey @username! We\'re running a giveaway in our server. Head over to the #giveaways channel to enter!',
+          createdAt: new Date()
+        }
+      ]);
+    }
+
+    // Check if rate limits exist
+    const rateLimitsExist = await db.select().from(rateLimits);
+    if (rateLimitsExist.length === 0) {
+      // Add default rate limits
+      await db.insert(rateLimits).values({
+        messagesPerMinute: 5,
+        cooldownSeconds: 15,
+        maxQueueSize: 10000,
+        updatedAt: new Date()
+      });
+    }
+
+    // Check if bot settings exist
+    const botSettingsExist = await db.select().from(botSettings);
+    if (botSettingsExist.length === 0) {
+      // Add default bot settings
+      await db.insert(botSettings).values({
+        status: 'offline',
+        token: null,
+        lastConnectedAt: null,
+        updatedAt: new Date()
+      });
+    }
+  }
+}
+
+// Using the DatabaseStorage to persist data
+export const storage = new DatabaseStorage();
+
+// Initialize default data
+(async () => {
+  try {
+    await storage.initializeDefaults();
+    console.log("Database initialized with default data");
+  } catch (error) {
+    console.error("Error initializing database:", error);
+  }
+})();

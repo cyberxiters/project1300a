@@ -80,15 +80,15 @@ interface NavLinkProps {
 function NavLink({ href, icon, label, isActive }: NavLinkProps) {
   return (
     <Link href={href}>
-      <a className={cn(
-        "flex items-center px-4 py-2 rounded mx-2 mt-1 transition-colors",
+      <div className={cn(
+        "flex items-center px-4 py-2 rounded mx-2 mt-1 transition-colors cursor-pointer",
         isActive 
           ? "text-sidebar-foreground bg-sidebar-primary bg-opacity-30" 
           : "text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent"
       )}>
         <span className="h-5 w-5 mr-3">{icon}</span>
         {label}
-      </a>
+      </div>
     </Link>
   );
 }

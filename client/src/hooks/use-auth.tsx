@@ -41,14 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
-  } = useQuery<User | undefined, Error>({
+  } = useQuery<User | null, Error>({
     queryKey: ["/api/user"],
     queryFn: async () => {
       try {
         const res = await fetch("/api/user");
         
-        // If not authenticated, return undefined (not an error)
-        if (res.status === 401) return undefined;
+        // If not authenticated, return null (not an error)
+        if (res.status === 401) return null;
         
         // For other errors, throw
         if (!res.ok) {
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return await res.json();
       } catch (error) {
         console.error("Error fetching user:", error);
-        return undefined;
+        return null;
       }
     },
     retry: false,

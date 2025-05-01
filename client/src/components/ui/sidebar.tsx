@@ -1,5 +1,6 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 // Icons
 import { 
@@ -8,7 +9,9 @@ import {
   FileText,
   FileEdit,
   Settings,
-  Gauge
+  Gauge,
+  LogOut,
+  User
 } from "lucide-react";
 
 interface SidebarProps {
@@ -16,6 +19,14 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ currentPath }: SidebarProps) {
+  const { user, logoutMutation } = useAuth();
+  const [_, navigate] = useLocation();
+
+  const handleLogout = async () => {
+    await logoutMutation.mutateAsync();
+    navigate("/auth");
+  };
+
   return (
     <div className="bg-sidebar w-64 flex-shrink-0 flex flex-col h-full overflow-hidden">
       <div className="p-4 border-b border-sidebar-border">
@@ -39,6 +50,20 @@ export default function Sidebar({ currentPath }: SidebarProps) {
           Settings
         </div>
         <NavLink href="/settings" icon={<Settings />} label="Bot Settings" isActive={currentPath === "/settings"} />
+        
+        <div className="px-4 my-2 text-sidebar-foreground text-sm font-semibold uppercase tracking-wider">
+          Account
+        </div>
+        <button 
+          onClick={handleLogout}
+          className={cn(
+            "flex items-center px-4 py-2 rounded mx-2 mt-1 transition-colors w-full text-left",
+            "text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent"
+          )}
+        >
+          <span className="h-5 w-5 mr-3"><LogOut /></span>
+          Logout
+        </button>
       </nav>
       <BotStatus />
     </div>

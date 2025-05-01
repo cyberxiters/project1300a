@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { discordClient } from "./discord/client";
@@ -10,8 +10,68 @@ import {
   insertRateLimitSchema,
   insertBotSettingsSchema
 } from "@shared/schema";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { setupAuth, requireAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Apply security middleware
+  
+  // Set security headers with Helmet
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        imgSrc: ["'self'", 'data:', 'https://cdn.discordapp.com'],
+        connectSrc: ["'self'", 'https://discord.com']
+      }
+    },
+    // For development, you might want to disable this in production
+    crossOriginEmbedderPolicy: false
+  }));
+  
+  // Set up authentication
+  setupAuth(app);
+  
+  // Add global rate limiting to prevent brute force attacks
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
+  });
+  
+  // Apply the rate limiter to all API routes
+  app.use('/api/', apiLimiter);
+  
+  // Stricter rate limit for authentication endpoints
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 5, // Limit each IP to 5 login/register attempts per windowMs
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Too many login attempts, please try again later.' }
+  });
+  
+  // Apply stricter rate limit to auth endpoints
+  app.use('/api/login', authLimiter);
+  app.use('/api/register', authLimiter);
+  
+  // Global error handler
+  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    console.error(err.stack);
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+    });
+  });
+  
+  // Non-authenticated routes (public)
+  // These APIs don't require authentication
   // Discord Bot Status API
   app.get("/api/bot/status", async (_req: Request, res: Response) => {
     const settings = await storage.getBotSettings();
@@ -24,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Discord Bot Connect/Disconnect
-  app.post("/api/bot/connect", async (req: Request, res: Response) => {
+  app.post("/api/bot/connect", requireAuth, async (req: Request, res: Response) => {
     try {
       // If we already have a token, use that. Otherwise, use the one provided in the request
       const settings = await storage.getBotSettings();
@@ -50,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/bot/disconnect", async (_req: Request, res: Response) => {
+  app.post("/api/bot/disconnect", requireAuth, async (_req: Request, res: Response) => {
     try {
       await discordClient.disconnect();
       res.json({ success: true });
@@ -59,8 +119,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Bot Settings API
-  app.get("/api/bot/settings", async (_req: Request, res: Response) => {
+  // Bot Settings API - Protected
+  app.get("/api/bot/settings", requireAuth, async (_req: Request, res: Response) => {
     const settings = await storage.getBotSettings();
     
     // Don't send the token back to the client
@@ -72,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/bot/settings", async (req: Request, res: Response) => {
+  app.post("/api/bot/settings", requireAuth, async (req: Request, res: Response) => {
     try {
       const validatedData = insertBotSettingsSchema.parse(req.body);
       const settings = await storage.updateBotSettings(validatedData);

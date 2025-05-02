@@ -39,13 +39,14 @@ export function setupAuth(app: Express) {
   
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "discord-bot-secret",
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     cookie: {
       secure: false, // Set to false for development
       sameSite: 'lax',
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+      path: '/'
     },
     store: new PostgresSessionStore({
       pool,
@@ -108,7 +109,9 @@ export function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json(user);
+        // Send back the user info (but not the password)
+        const { password, ...userWithoutPassword } = user;
+        res.status(201).json(userWithoutPassword);
       });
     } catch (error) {
       next(error);
@@ -124,7 +127,9 @@ export function setupAuth(app: Express) {
       }
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(200).json(user);
+        // Send back the user info (but not the password)
+        const { password, ...userWithoutPassword } = user;
+        res.status(200).json(userWithoutPassword);
       });
     })(req, res, next);
   });
@@ -142,7 +147,9 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: "Not authenticated" });
     }
-    res.json(req.user);
+    // Don't send back the password
+    const { password, ...userWithoutPassword } = req.user;
+    res.json(userWithoutPassword);
   });
 }
 

@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Events, Guild, GuildMember } from 'discord.js';
+import { Client, GatewayIntentBits, Events, Guild, GuildMember, ActivityType } from 'discord.js';
 import { storage } from '../storage';
 import { MessageQueue } from './messageQueue';
 import { log } from '../vite';
@@ -10,6 +10,10 @@ export class DiscordClient {
   private isReady = false;
   private messageQueue: MessageQueue;
   private rateLimiter: RateLimiter;
+  private keepAliveInterval: NodeJS.Timeout | null = null;
+  private activityInterval: NodeJS.Timeout | null = null;
+  private sessionDuration = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+  private sessionStartTime: number = 0;
   
   private constructor() {
     this.client = new Client({
@@ -30,6 +34,13 @@ export class DiscordClient {
     this.client.on(Events.ClientReady, async () => {
       log(`Discord bot logged in as ${this.client.user?.tag}`, 'discord');
       this.isReady = true;
+      this.sessionStartTime = Date.now();
+      
+      // Set bot activity to "Playing Cyber Artist X"
+      this.setBotActivity();
+      
+      // Start keep-alive mechanism
+      this.startKeepAlive();
       
       // Update bot status in storage
       await storage.updateBotSettings({
@@ -62,7 +73,9 @@ export class DiscordClient {
   private async registerGuilds() {
     const guilds = this.client.guilds.cache;
     
-    for (const guild of guilds.values()) {
+    // Using Array.from to avoid iterator issues
+    const guildArray = Array.from(guilds.values());
+    for (const guild of guildArray) {
       await this.registerGuild(guild);
     }
   }
@@ -118,8 +131,64 @@ export class DiscordClient {
     }
   }
   
+  // Set the bot's activity status
+  private setBotActivity() {
+    if (!this.isReady || !this.client.user) return;
+    
+    // Set the initial activity
+    this.client.user.setActivity({
+      name: 'Cyber Artist X',
+      type: ActivityType.Playing
+    });
+    
+    // Refresh activity every 30 minutes to ensure it stays set
+    this.activityInterval = setInterval(() => {
+      if (this.client.user) {
+        this.client.user.setActivity({
+          name: 'Cyber Artist X',
+          type: ActivityType.Playing
+        });
+        log('Refreshed bot activity status', 'discord');
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+  }
+  
+  // Set up a keep-alive mechanism
+  private startKeepAlive() {
+    // Check every minute if bot should still be active
+    this.keepAliveInterval = setInterval(() => {
+      const currentTime = Date.now();
+      const sessionElapsed = currentTime - this.sessionStartTime;
+      
+      // Log periodic status to keep connection active
+      if (this.isReady) {
+        log(`Bot active for ${Math.floor(sessionElapsed / 60000)} minutes`, 'discord');
+        
+        // If session duration (3 hours) has elapsed, consider disconnecting
+        if (sessionElapsed >= this.sessionDuration) {
+          log('Bot has been active for 3 hours - ready to disconnect if needed', 'discord');
+          // We don't automatically disconnect here, just log that the time has elapsed
+        }
+      }
+    }, 60 * 1000); // Check every minute
+  }
+  
+  // Clear intervals when disconnecting
+  private clearIntervals() {
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+      this.keepAliveInterval = null;
+    }
+    
+    if (this.activityInterval) {
+      clearInterval(this.activityInterval);
+      this.activityInterval = null;
+    }
+  }
+  
   async disconnect() {
     this.messageQueue.stopProcessing();
+    this.clearIntervals();
     this.client.destroy();
     this.isReady = false;
     

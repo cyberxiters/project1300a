@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,28 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { z } from "zod";
-import { AlertCircle, CheckCircle, RefreshCw, ShieldAlert, Clock, Server } from "lucide-react";
-import { insertRateLimitSchema, insertBotSettingsSchema } from "@shared/schema";
+import { 
+  AlertCircle, 
+  CheckCircle, 
+  RefreshCw, 
+  ShieldAlert, 
+  Clock, 
+  Server, 
+  Plus, 
+  Key, 
+  Trash2, 
+  Power 
+} from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger 
+} from "@/components/ui/dialog";
+import { insertRateLimitSchema, insertBotSettingsSchema, insertBotTokenSchema } from "@shared/schema";
 import { cn, formatDate } from "@/lib/utils";
 
 // Rate limit form schema
@@ -28,10 +48,20 @@ const botSettingsFormSchema = z.object({
 });
 type BotSettingsFormValues = z.infer<typeof botSettingsFormSchema>;
 
+// Bot token form schema
+const botTokenFormSchema = insertBotTokenSchema.extend({
+  token: z.string().min(50, "Bot token must be at least 50 characters")
+});
+type BotTokenFormValues = z.infer<typeof botTokenFormSchema>;
+
 export default function Settings() {
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isAddingToken, setIsAddingToken] = useState(false);
+  const [isActivatingToken, setIsActivatingToken] = useState(false);
+  const [isDeletingToken, setIsDeletingToken] = useState(false);
+  const [addTokenOpen, setAddTokenOpen] = useState(false);
 
   // Fetch rate limits
   const { data: rateLimits, isLoading: rateLimitsLoading } = useQuery({
@@ -49,6 +79,11 @@ export default function Settings() {
   const { data: botSettings, isLoading: botSettingsLoading } = useQuery({
     queryKey: ['/api/bot/settings'],
   });
+  
+  // Fetch bot tokens
+  const { data: botTokens, isLoading: botTokensLoading } = useQuery({
+    queryKey: ['/api/bot/tokens'],
+  });
 
   // Rate limit form
   const rateLimitForm = useForm<RateLimitFormValues>({
@@ -65,6 +100,16 @@ export default function Settings() {
     resolver: zodResolver(botSettingsFormSchema),
     defaultValues: {
       token: ""
+    }
+  });
+  
+  // Bot token form
+  const botTokenForm = useForm<BotTokenFormValues>({
+    resolver: zodResolver(botTokenFormSchema),
+    defaultValues: {
+      name: "",
+      token: "",
+      isActive: true
     }
   });
 
@@ -102,7 +147,7 @@ export default function Settings() {
   });
 
   const connectBotMutation = useMutation({
-    mutationFn: async (data: { token?: string }) => {
+    mutationFn: async (data: { token?: string, tokenId?: number }) => {
       setIsConnecting(true);
       const response = await apiRequest('POST', '/api/bot/connect', data);
       return response.json();
@@ -151,6 +196,86 @@ export default function Settings() {
       setIsDisconnecting(false);
     }
   });
+  
+  // Token mutations
+  const addTokenMutation = useMutation({
+    mutationFn: async (data: BotTokenFormValues) => {
+      setIsAddingToken(true);
+      const response = await apiRequest('POST', '/api/bot/tokens', data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/bot/tokens'] });
+      toast({
+        title: "Token added",
+        description: "Your Discord bot token has been added successfully",
+      });
+      setIsAddingToken(false);
+      setAddTokenOpen(false);
+      botTokenForm.reset({
+        name: "",
+        token: "",
+        isActive: true
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to add token: ${error.message}`,
+        variant: "destructive",
+      });
+      setIsAddingToken(false);
+    }
+  });
+  
+  const activateTokenMutation = useMutation({
+    mutationFn: async (id: number) => {
+      setIsActivatingToken(true);
+      const response = await apiRequest('PATCH', `/api/bot/tokens/${id}/activate`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/bot/tokens'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bot/settings'] });
+      toast({
+        title: "Token activated",
+        description: "The bot token has been activated successfully",
+      });
+      setIsActivatingToken(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to activate token: ${error.message}`,
+        variant: "destructive",
+      });
+      setIsActivatingToken(false);
+    }
+  });
+  
+  const deleteTokenMutation = useMutation({
+    mutationFn: async (id: number) => {
+      setIsDeletingToken(true);
+      const response = await apiRequest('DELETE', `/api/bot/tokens/${id}`, {});
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/bot/tokens'] });
+      toast({
+        title: "Token deleted",
+        description: "The bot token has been deleted successfully",
+      });
+      setIsDeletingToken(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to delete token: ${error.message}`,
+        variant: "destructive",
+      });
+      setIsDeletingToken(false);
+    }
+  });
 
   // Form submission handlers
   const onRateLimitSubmit = (data: RateLimitFormValues) => {
@@ -159,6 +284,10 @@ export default function Settings() {
 
   const onBotSettingsSubmit = (data: BotSettingsFormValues) => {
     connectBotMutation.mutate({ token: data.token });
+  };
+  
+  const onBotTokenSubmit = (data: BotTokenFormValues) => {
+    addTokenMutation.mutate(data);
   };
 
   const handleConnectBot = () => {
@@ -173,6 +302,27 @@ export default function Settings() {
 
   const handleDisconnectBot = () => {
     disconnectBotMutation.mutate();
+  };
+  
+  const handleActivateToken = (id: number) => {
+    activateTokenMutation.mutate(id);
+  };
+  
+  const handleDeleteToken = (id: number) => {
+    if (confirm("Are you sure you want to delete this token?")) {
+      deleteTokenMutation.mutate(id);
+    }
+  };
+  
+  const handleConnectWithToken = (id: number) => {
+    if (botStatus?.status === 'online') {
+      if (confirm("Bot is already connected. Disconnect first?")) {
+        disconnectBotMutation.mutate();
+      }
+      return;
+    }
+    
+    connectBotMutation.mutate({ tokenId: id });
   };
 
   return (
@@ -292,11 +442,195 @@ export default function Settings() {
               </Card>
             </div>
             
+            {/* Bot Tokens Card */}
             <Card className="bg-discord-darker shadow-lg">
               <CardHeader>
-                <CardTitle className="text-white">Bot Configuration</CardTitle>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-white">Bot Tokens</CardTitle>
+                    <CardDescription className="text-discord-light">
+                      Manage your Discord bot tokens.
+                    </CardDescription>
+                  </div>
+                  <Dialog open={addTokenOpen} onOpenChange={setAddTokenOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-discord-success hover:bg-discord-success/80 text-white">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add New Token
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-discord-darker border-discord-dark text-white">
+                      <DialogHeader>
+                        <DialogTitle className="text-white">Add New Bot Token</DialogTitle>
+                        <DialogDescription className="text-discord-light">
+                          Add a new Discord bot token to use with your campaigns.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Form {...botTokenForm}>
+                        <form onSubmit={botTokenForm.handleSubmit(onBotTokenSubmit)} className="space-y-4">
+                          <FormField
+                            control={botTokenForm.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-discord-light">Token Name</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="My Discord Bot"
+                                    className="bg-discord-darkest border-discord-dark text-white focus-visible:ring-discord-primary"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormDescription className="text-discord-light text-xs">
+                                  A name to identify this token (e.g., "Production Bot", "Test Bot")
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={botTokenForm.control}
+                            name="token"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-discord-light">Bot Token</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="password"
+                                    placeholder="Enter your Discord bot token"
+                                    className="bg-discord-darkest border-discord-dark text-white focus-visible:ring-discord-primary"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormDescription className="text-discord-light text-xs">
+                                  The token for your Discord bot from the Discord Developer Portal
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={botTokenForm.control}
+                            name="isActive"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border border-discord-dark p-3">
+                                <div className="space-y-0.5">
+                                  <FormLabel className="text-discord-light">Set as Active</FormLabel>
+                                  <FormDescription className="text-discord-light text-xs">
+                                    Make this token the active token for the bot
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    className="data-[state=checked]:bg-discord-primary"
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <DialogFooter className="mt-6">
+                            <Button type="button" variant="secondary" onClick={() => setAddTokenOpen(false)} className="bg-discord-darker text-white border border-discord-dark hover:bg-discord-dark">
+                              Cancel
+                            </Button>
+                            <Button type="submit" className="bg-discord-primary hover:bg-discord-secondary text-white" disabled={isAddingToken}>
+                              {isAddingToken ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                  Adding...
+                                </>
+                              ) : (
+                                <>
+                                  <Key className="w-4 h-4 mr-2" />
+                                  Add Token
+                                </>
+                              )}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {botTokensLoading ? (
+                  <div className="flex justify-center py-6">
+                    <RefreshCw className="w-6 h-6 animate-spin text-discord-light" />
+                  </div>
+                ) : botTokens?.length === 0 ? (
+                  <div className="bg-discord-darkest bg-opacity-50 rounded-lg p-6 text-center">
+                    <Key className="w-8 h-8 mx-auto mb-3 text-discord-light" />
+                    <h4 className="text-white font-medium mb-2">No Bot Tokens</h4>
+                    <p className="text-discord-light text-sm mb-4">
+                      You haven't added any Discord bot tokens yet. Add a token to get started.
+                    </p>
+                    <Button className="bg-discord-primary hover:bg-discord-secondary text-white mx-auto" onClick={() => setAddTokenOpen(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add First Token
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {botTokens.map((token) => (
+                      <div key={token.id} className="bg-discord-darkest rounded-lg p-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className={cn(
+                            "w-3 h-3 rounded-full",
+                            token.isActive ? "bg-discord-success" : "bg-discord-light/30"
+                          )} />
+                          <div>
+                            <h4 className="text-white font-medium">{token.name}</h4>
+                            <p className="text-discord-light text-xs">
+                              Token: {token.token}
+                              <span className="text-discord-lightgray ml-2 text-opacity-50">
+                                • Added {formatDate(token.createdAt)}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            className={cn(
+                              "h-8 px-3",
+                              token.isActive
+                                ? "bg-discord-success hover:bg-discord-success/80 text-white cursor-not-allowed opacity-50"
+                                : "bg-discord-primary hover:bg-discord-secondary text-white"
+                            )}
+                            onClick={() => handleActivateToken(token.id)}
+                            disabled={token.isActive || isActivatingToken}
+                          >
+                            {token.isActive ? "Active" : "Activate"}
+                          </Button>
+                          <Button
+                            className="h-8 px-3 bg-discord-info hover:bg-discord-info/80 text-white"
+                            onClick={() => handleConnectWithToken(token.id)}
+                            disabled={isConnecting || isDisconnecting}
+                          >
+                            Connect
+                          </Button>
+                          <Button
+                            className="h-8 w-8 p-0 bg-discord-danger hover:bg-discord-danger/80 text-white"
+                            onClick={() => handleDeleteToken(token.id)}
+                            disabled={isDeletingToken}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* Quick Connect Form */}
+            <Card className="bg-discord-darker shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-white">Quick Connect</CardTitle>
                 <CardDescription className="text-discord-light">
-                  Configure your Discord bot settings for mass DM functionality.
+                  Connect a new bot token without saving it.
                 </CardDescription>
               </CardHeader>
               <CardContent>

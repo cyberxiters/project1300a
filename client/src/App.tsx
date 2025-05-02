@@ -15,6 +15,7 @@ import AuthPage from "@/pages/auth-page";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { useIsMobile } from "@/hooks/use-mobile";
+import TokenTest from "@/pages/token-test";
 
 function Router() {
   const [location] = useLocation();
@@ -73,6 +74,7 @@ function Router() {
             <ProtectedRoute path="/logs" component={Logs} />
             <ProtectedRoute path="/templates" component={Templates} />
             <ProtectedRoute path="/settings" component={Settings} />
+            <Route path="/token-test" component={TokenTest} />
             <Route component={NotFound} />
           </Switch>
         </div>

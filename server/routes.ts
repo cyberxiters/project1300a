@@ -200,7 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Bot Token API
-  app.get("/api/bot/tokens", requireAuth, async (_req: Request, res: Response) => {
+  app.get("/api/bot/tokens", async (_req: Request, res: Response) => {
     try {
       const tokens = await storage.getBotTokens();
       // Return tokens with sensitive data masked

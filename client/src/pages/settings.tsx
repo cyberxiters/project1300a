@@ -64,24 +64,24 @@ export default function Settings() {
   const [addTokenOpen, setAddTokenOpen] = useState(false);
 
   // Fetch rate limits
-  const { data: rateLimits, isLoading: rateLimitsLoading } = useQuery({
+  const { data: rateLimits = {messagesPerMinute: 20, cooldownSeconds: 10, maxQueueSize: 5000}, isLoading: rateLimitsLoading } = useQuery<any>({
     queryKey: ['/api/ratelimits'],
     refetchInterval: 10000, // Refresh every 10 seconds
   });
 
-  // Fetch bot settings
-  const { data: botStatus, isLoading: botStatusLoading } = useQuery({
+  // Fetch bot status
+  const { data: botStatus = {status: 'offline', lastConnectedAt: null}, isLoading: botStatusLoading } = useQuery<any>({
     queryKey: ['/api/bot/status'],
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 
   // Fetch bot settings
-  const { data: botSettings, isLoading: botSettingsLoading } = useQuery({
+  const { data: botSettings = {token: null, status: 'offline'}, isLoading: botSettingsLoading } = useQuery<any>({
     queryKey: ['/api/bot/settings'],
   });
   
   // Fetch bot tokens
-  const { data: botTokens, isLoading: botTokensLoading } = useQuery({
+  const { data: botTokens = [], isLoading: botTokensLoading } = useQuery<any[]>({
     queryKey: ['/api/bot/tokens'],
   });
 

@@ -110,14 +110,15 @@ export class DiscordClient {
   
   async initialize() {
     try {
-      const settings = await storage.getBotSettings();
+      // Get active bot token from storage
+      const activeToken = await storage.getActiveBotToken();
       
-      if (!settings || !settings.token) {
-        log('No Discord bot token found. Please configure the bot.', 'discord');
+      if (!activeToken) {
+        log('No active Discord bot token found. Please add and activate a bot token.', 'discord');
         return false;
       }
       
-      await this.client.login(settings.token);
+      await this.client.login(activeToken.token);
       return true;
     } catch (error) {
       log(`Failed to initialize Discord client: ${(error as Error).message}`, 'discord');

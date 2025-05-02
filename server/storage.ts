@@ -99,10 +99,12 @@ export class MemStorage implements IStorage {
     this.messageTemplates = new Map();
     this.campaigns = new Map();
     this.messageLogs = [];
+    this.botTokens = new Map();
     this.currentUserId = 1;
     this.currentTemplateId = 1;
     this.currentCampaignId = 1;
     this.currentLogId = 1;
+    this.currentTokenId = 1;
 
     // Initialize with default rate limits
     this.rateLimits = {
@@ -116,9 +118,9 @@ export class MemStorage implements IStorage {
     // Initialize with default bot settings
     this.botSettings = {
       id: 1,
-      token: undefined,
+      activeTokenId: null,
       status: 'offline',
-      lastConnectedAt: undefined,
+      lastConnectedAt: null,
       updatedAt: new Date()
     };
 
@@ -309,6 +311,97 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     return this.rateLimits;
+  }
+
+  // Bot Token operations
+  async getBotTokens(): Promise<BotToken[]> {
+    return Array.from(this.botTokens.values());
+  }
+
+  async getBotToken(id: number): Promise<BotToken | undefined> {
+    return this.botTokens.get(id);
+  }
+
+  async getActiveBotToken(): Promise<BotToken | undefined> {
+    if (!this.botSettings?.activeTokenId) return undefined;
+    return this.botTokens.get(this.botSettings.activeTokenId);
+  }
+
+  async createBotToken(token: InsertBotToken): Promise<BotToken> {
+    const id = this.currentTokenId++;
+    const newToken: BotToken = {
+      ...token,
+      id,
+      createdAt: new Date()
+    };
+    this.botTokens.set(id, newToken);
+    
+    // If this is the first token or it's marked as active, update bot settings
+    if (token.isActive || this.botTokens.size === 1) {
+      await this.activateBotToken(id);
+    }
+    
+    return newToken;
+  }
+
+  async updateBotToken(id: number, token: Partial<BotToken>): Promise<BotToken | undefined> {
+    const existingToken = this.botTokens.get(id);
+    if (!existingToken) return undefined;
+    
+    const updatedToken = { ...existingToken, ...token };
+    this.botTokens.set(id, updatedToken);
+    
+    // If the token is being activated, update other tokens and bot settings
+    if (token.isActive) {
+      await this.activateBotToken(id);
+    }
+    
+    return updatedToken;
+  }
+
+  async deleteBotToken(id: number): Promise<boolean> {
+    const token = this.botTokens.get(id);
+    if (!token) return false;
+    
+    const wasActive = token.isActive;
+    const deleted = this.botTokens.delete(id);
+    
+    // If the active token was deleted, clear the active token id
+    if (wasActive && this.botSettings) {
+      this.botSettings.activeTokenId = null;
+      
+      // If there are other tokens, activate the first one
+      const remainingTokens = Array.from(this.botTokens.values());
+      if (remainingTokens.length > 0) {
+        await this.activateBotToken(remainingTokens[0].id);
+      }
+    }
+    
+    return deleted;
+  }
+
+  async activateBotToken(id: number): Promise<BotToken | undefined> {
+    const token = this.botTokens.get(id);
+    if (!token) return undefined;
+    
+    // Deactivate all tokens
+    for (const [tokenId, existingToken] of this.botTokens.entries()) {
+      if (existingToken.isActive && tokenId !== id) {
+        this.botTokens.set(tokenId, { ...existingToken, isActive: false });
+      }
+    }
+    
+    // Activate the requested token
+    const activatedToken = { ...token, isActive: true };
+    this.botTokens.set(id, activatedToken);
+    
+    // Update bot settings
+    if (this.botSettings) {
+      this.botSettings.activeTokenId = id;
+      this.botSettings.updatedAt = new Date();
+    }
+    
+    return activatedToken;
   }
 
   // Bot Settings operations
@@ -540,6 +633,117 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Bot Token operations
+  async getBotTokens(): Promise<BotToken[]> {
+    return await db.select().from(botTokens);
+  }
+
+  async getBotToken(id: number): Promise<BotToken | undefined> {
+    const [token] = await db.select().from(botTokens).where(eq(botTokens.id, id));
+    return token || undefined;
+  }
+
+  async getActiveBotToken(): Promise<BotToken | undefined> {
+    const [token] = await db.select().from(botTokens).where(eq(botTokens.isActive, true));
+    return token || undefined;
+  }
+
+  async createBotToken(token: InsertBotToken): Promise<BotToken> {
+    // If token is set to active, deactivate all other tokens first
+    if (token.isActive) {
+      await db.update(botTokens).set({ isActive: false }).where(eq(botTokens.isActive, true));
+    }
+    
+    const now = new Date();
+    const [newToken] = await db
+      .insert(botTokens)
+      .values({
+        ...token,
+        createdAt: now
+      })
+      .returning();
+    
+    // If this is the first token or it's marked as active, update bot settings
+    if (token.isActive) {
+      await this.updateBotSettings({ activeTokenId: newToken.id });
+    } else {
+      // Check if this is the only token and no active token exists
+      const tokens = await this.getBotTokens();
+      const activeToken = tokens.find(t => t.isActive);
+      
+      if (tokens.length === 1 || !activeToken) {
+        await this.activateBotToken(newToken.id);
+      }
+    }
+    
+    return newToken;
+  }
+
+  async updateBotToken(id: number, token: Partial<BotToken>): Promise<BotToken | undefined> {
+    // If token is set to active, deactivate all other tokens first
+    if (token.isActive) {
+      await db.update(botTokens).set({ isActive: false }).where(eq(botTokens.isActive, true));
+    }
+    
+    const [updatedToken] = await db
+      .update(botTokens)
+      .set(token)
+      .where(eq(botTokens.id, id))
+      .returning();
+    
+    // If the token is being activated, update bot settings
+    if (token.isActive) {
+      await this.updateBotSettings({ activeTokenId: id });
+    }
+    
+    return updatedToken || undefined;
+  }
+
+  async deleteBotToken(id: number): Promise<boolean> {
+    // Check if this is the active token
+    const [token] = await db.select().from(botTokens).where(eq(botTokens.id, id));
+    if (!token) return false;
+    
+    const wasActive = token.isActive;
+    
+    // Delete the token
+    const result = await db.delete(botTokens).where(eq(botTokens.id, id));
+    const deleted = result.rowCount && result.rowCount > 0;
+    
+    if (deleted && wasActive) {
+      // Clear active token in settings
+      await this.updateBotSettings({ activeTokenId: null });
+      
+      // If there are other tokens, activate the first one
+      const tokens = await this.getBotTokens();
+      if (tokens.length > 0) {
+        await this.activateBotToken(tokens[0].id);
+      }
+    }
+    
+    return deleted;
+  }
+
+  async activateBotToken(id: number): Promise<BotToken | undefined> {
+    // Deactivate all tokens
+    await db.update(botTokens).set({ isActive: false });
+    
+    // Activate the requested token
+    const [activatedToken] = await db
+      .update(botTokens)
+      .set({ isActive: true })
+      .where(eq(botTokens.id, id))
+      .returning();
+    
+    if (activatedToken) {
+      // Update bot settings
+      await this.updateBotSettings({ activeTokenId: id });
+      return activatedToken;
+    }
+    
+    return undefined;
+  }
+
   // Bot Settings operations
   async getBotSettings(): Promise<BotSettings | undefined> {
     const [settings] = await db.select().from(botSettings);
@@ -556,9 +760,8 @@ export class DatabaseStorage implements IStorage {
       const [newSettings] = await db
         .insert(botSettings)
         .values({
-          id: 1,
           status: settings.status || 'offline',
-          token: settings.token || null,
+          activeTokenId: settings.activeTokenId || null,
           lastConnectedAt: settings.lastConnectedAt || null,
           updatedAt: now
         })
@@ -621,7 +824,7 @@ export class DatabaseStorage implements IStorage {
       // Add default bot settings
       await db.insert(botSettings).values({
         status: 'offline',
-        token: null,
+        activeTokenId: null,
         lastConnectedAt: null,
         updatedAt: new Date()
       });

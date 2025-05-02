@@ -85,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Discord Bot Connect/Disconnect
-  app.post("/api/bot/connect", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/bot/connect", async (req: Request, res: Response) => {
     try {
       // If a token ID is provided, activate that token first
       if (req.body.tokenId) {
@@ -136,7 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/bot/disconnect", requireAuth, async (_req: Request, res: Response) => {
+  app.post("/api/bot/disconnect", async (_req: Request, res: Response) => {
     try {
       await discordClient.disconnect();
       res.json({ success: true });
@@ -146,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Bot Settings API - Protected
-  app.get("/api/bot/settings", requireAuth, async (_req: Request, res: Response) => {
+  app.get("/api/bot/settings", async (_req: Request, res: Response) => {
     const settings = await storage.getBotSettings();
     
     if (settings) {
@@ -168,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/bot/settings", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/bot/settings", async (req: Request, res: Response) => {
     try {
       // Only allow updating certain settings
       const validatedData = {
@@ -214,7 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/bot/tokens", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/bot/tokens", async (req: Request, res: Response) => {
     try {
       const validatedData = insertBotTokenSchema.parse(req.body);
       
@@ -231,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.patch("/api/bot/tokens/:id/activate", requireAuth, async (req: Request, res: Response) => {
+  app.patch("/api/bot/tokens/:id/activate", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -254,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete("/api/bot/tokens/:id", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/bot/tokens/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {

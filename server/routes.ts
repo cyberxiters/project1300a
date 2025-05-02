@@ -8,7 +8,8 @@ import {
   insertCampaignSchema, 
   insertMessageTemplateSchema, 
   insertRateLimitSchema,
-  insertBotSettingsSchema
+  insertBotSettingsSchema,
+  insertBotTokenSchema
 } from "@shared/schema";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -86,16 +87,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Discord Bot Connect/Disconnect
   app.post("/api/bot/connect", requireAuth, async (req: Request, res: Response) => {
     try {
-      // If we already have a token, use that. Otherwise, use the one provided in the request
-      const settings = await storage.getBotSettings();
+      // If a token ID is provided, activate that token first
+      if (req.body.tokenId) {
+        const tokenId = parseInt(req.body.tokenId);
+        if (isNaN(tokenId)) {
+          return res.status(400).json({ message: "Invalid token ID format" });
+        }
+        
+        const activatedToken = await storage.activateBotToken(tokenId);
+        if (!activatedToken) {
+          return res.status(404).json({ message: "Token not found" });
+        }
+      } 
       
-      if (req.body.token) {
-        await storage.updateBotSettings({
+      // If a new token is provided, create and activate it
+      else if (req.body.token) {
+        const newToken = await storage.createBotToken({
+          name: req.body.name || 'Default Token',
           token: req.body.token,
-          status: 'connecting'
+          isActive: true
         });
-      } else if (!settings?.token) {
-        return res.status(400).json({ message: "No token provided and no token found in storage" });
+        
+        if (!newToken) {
+          return res.status(500).json({ message: "Failed to create token" });
+        }
+      }
+      
+      // Update bot status to connecting
+      await storage.updateBotSettings({
+        status: 'connecting'
+      });
+      
+      // Check if we have an active token
+      const activeToken = await storage.getActiveBotToken();
+      if (!activeToken) {
+        return res.status(400).json({ message: "No active token found. Please provide or activate a token." });
       }
       
       const connected = await discordClient.initialize();
@@ -123,10 +149,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/bot/settings", requireAuth, async (_req: Request, res: Response) => {
     const settings = await storage.getBotSettings();
     
-    // Don't send the token back to the client
     if (settings) {
-      const { token, ...rest } = settings;
-      res.json(rest);
+      // Get active token info
+      const activeToken = await storage.getActiveBotToken();
+      
+      // Return settings with active token info
+      res.json({
+        ...settings,
+        activeToken: activeToken ? {
+          id: activeToken.id,
+          name: activeToken.name,
+          // Mask the token for security
+          token: activeToken.token.substring(0, 5) + '...' + activeToken.token.substring(activeToken.token.length - 5)
+        } : null
+      });
     } else {
       res.status(404).json({ message: "Bot settings not found" });
     }
@@ -134,17 +170,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/bot/settings", requireAuth, async (req: Request, res: Response) => {
     try {
-      const validatedData = insertBotSettingsSchema.parse(req.body);
+      // Only allow updating certain settings
+      const validatedData = {
+        status: req.body.status
+      };
+      
       const settings = await storage.updateBotSettings(validatedData);
       
       if (settings) {
-        const { token, ...rest } = settings;
-        res.json(rest);
+        // Get active token info
+        const activeToken = await storage.getActiveBotToken();
+        
+        // Return settings with active token info
+        res.json({
+          ...settings,
+          activeToken: activeToken ? {
+            id: activeToken.id,
+            name: activeToken.name,
+            // Mask the token for security
+            token: activeToken.token.substring(0, 5) + '...' + activeToken.token.substring(activeToken.token.length - 5)
+          } : null
+        });
       } else {
         res.status(404).json({ message: "Bot settings not found" });
       }
     } catch (error) {
       res.status(400).json({ message: (error as Error).message });
+    }
+  });
+  
+  // Bot Token API
+  app.get("/api/bot/tokens", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const tokens = await storage.getBotTokens();
+      // Return tokens with sensitive data masked
+      const safeTokens = tokens.map(token => ({
+        ...token,
+        token: token.token.substring(0, 5) + '...' + token.token.substring(token.token.length - 5)
+      }));
+      res.json(safeTokens);
+    } catch (error) {
+      res.status(500).json({ message: (error as Error).message });
+    }
+  });
+  
+  app.post("/api/bot/tokens", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertBotTokenSchema.parse(req.body);
+      
+      const newToken = await storage.createBotToken(validatedData);
+      
+      // Return token with sensitive data masked
+      const safeToken = {
+        ...newToken,
+        token: newToken.token.substring(0, 5) + '...' + newToken.token.substring(newToken.token.length - 5)
+      };
+      res.status(201).json(safeToken);
+    } catch (error) {
+      res.status(400).json({ message: (error as Error).message });
+    }
+  });
+  
+  app.patch("/api/bot/tokens/:id/activate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid token ID" });
+      }
+      
+      const token = await storage.activateBotToken(id);
+      if (!token) {
+        return res.status(404).json({ message: "Token not found" });
+      }
+      
+      // Return token with sensitive data masked
+      const safeToken = {
+        ...token,
+        token: token.token.substring(0, 5) + '...' + token.token.substring(token.token.length - 5)
+      };
+      res.json(safeToken);
+    } catch (error) {
+      res.status(500).json({ message: (error as Error).message });
+    }
+  });
+  
+  app.delete("/api/bot/tokens/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid token ID" });
+      }
+      
+      const deleted = await storage.deleteBotToken(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Token not found" });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      res.status(500).json({ message: (error as Error).message });
     }
   });
   

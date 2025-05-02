@@ -21,13 +21,16 @@ function Router() {
   const { user, isLoading } = useAuth();
   const isMobile = useIsMobile();
   
+  // TEMPORARY: Bypass authentication checks for testing
   // Check if the current route is the auth page
   const isAuthPage = location === "/auth";
   
+  /*
   // If user is authenticated and on auth page, redirect to dashboard
   if (user && isAuthPage) {
     return <Redirect to="/" />;
   }
+  */
   
   // If we're on the auth page, don't show the sidebar
   if (isAuthPage) {
@@ -41,10 +44,12 @@ function Router() {
     );
   }
   
+  /*
   // If user is not authenticated and not on auth page, redirect to auth page
   if (!user && !isLoading && !isAuthPage) {
     return <Redirect to="/auth" />;
   }
+  */
   
   // For all other routes, show the appropriate navigation based on screen size
   return (

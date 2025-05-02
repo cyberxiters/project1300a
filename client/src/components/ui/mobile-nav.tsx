@@ -40,7 +40,7 @@ export function MobileNav() {
         <SheetContent side="left" className="w-[80%] max-w-sm pt-10">
           <nav className="flex flex-col gap-4">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-lg font-semibold">Discord Messenger</h2>
+              <h2 className="text-lg font-semibold">Cyber Artist X</h2>
               <Button 
                 variant="ghost" 
                 size="icon" 

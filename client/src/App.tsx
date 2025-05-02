@@ -57,7 +57,7 @@ function Router() {
         {isMobile && (
           <div className="sticky top-0 z-40 bg-background border-b flex items-center justify-between p-4">
             <MobileNav />
-            <h1 className="text-xl font-bold">Discord Messenger</h1>
+            <h1 className="text-xl font-bold">Cyber Artist X</h1>
           </div>
         )}
         

@@ -123,10 +123,10 @@ export default function AuthPage() {
           {isMobile && (
             <div className="mb-6 text-center">
               <h1 className="text-2xl font-bold tracking-tight text-primary mb-2">
-                Discord Message Manager
+                Cyber Artist X
               </h1>
               <p className="text-sm text-foreground/70">
-                Manage Discord messages with ease
+                Advanced AI Messaging Platform
               </p>
             </div>
           )}
@@ -147,7 +147,7 @@ export default function AuthPage() {
                 <CardHeader className={isMobile ? "px-4 py-4" : ""}>
                   <CardTitle className={isMobile ? "text-lg" : ""}>Login to your account</CardTitle>
                   <CardDescription className={isMobile ? "text-sm" : ""}>
-                    Enter your credentials to access the Discord bot manager
+                    Enter your credentials to access Cyber Artist X
                   </CardDescription>
                 </CardHeader>
                 <CardContent className={isMobile ? "px-4 pb-2" : ""}>
@@ -209,7 +209,7 @@ export default function AuthPage() {
                 <CardHeader className={isMobile ? "px-4 py-4" : ""}>
                   <CardTitle className={isMobile ? "text-lg" : ""}>Create an account</CardTitle>
                   <CardDescription className={isMobile ? "text-sm" : ""}>
-                    Register to access the Discord bot manager
+                    Register to access Cyber Artist X platform
                   </CardDescription>
                 </CardHeader>
                 <CardContent className={isMobile ? "px-4 pb-2" : ""}>
@@ -311,10 +311,10 @@ export default function AuthPage() {
         <div className="hidden md:flex flex-col justify-center">
           <div className="p-6 text-center md:text-left">
             <h1 className="text-3xl font-bold tracking-tight text-primary mb-4">
-              Discord Message Manager
+              Cyber Artist X
             </h1>
             <p className="text-xl text-foreground/80 mb-6">
-              Manage your Discord messaging campaigns with ease while staying compliant with Discord's Terms of Service.
+              Advanced messaging platform for creative digital communication across channels.
             </p>
             <div className="space-y-4 text-foreground/70">
               <div className="flex items-start">
@@ -324,8 +324,8 @@ export default function AuthPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">Rate Limited</h3>
-                  <p>Respects Discord's rate limits to avoid being flagged</p>
+                  <h3 className="font-semibold text-foreground">Smart Pacing</h3>
+                  <p>Intelligent message delivery with advanced rate limiting</p>
                 </div>
               </div>
               <div className="flex items-start">
@@ -336,8 +336,8 @@ export default function AuthPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">TOS Compliant</h3>
-                  <p>Designed to follow Discord's Terms of Service</p>
+                  <h3 className="font-semibold text-foreground">AI Enhanced</h3>
+                  <p>Cutting-edge AI technology for optimal communication</p>
                 </div>
               </div>
               <div className="flex items-start">

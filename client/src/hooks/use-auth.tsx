@@ -45,7 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/user"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/user");
+        const res = await fetch("/api/user", {
+          credentials: "include",
+          mode: "same-origin",
+          headers: {
+            "Accept": "application/json",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+          }
+        });
         
         // If not authenticated, return null (not an error)
         if (res.status === 401) return null;

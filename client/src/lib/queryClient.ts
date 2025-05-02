@@ -15,7 +15,8 @@ export async function apiRequest(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Cache-Control": "no-cache",
-    "Pragma": "no-cache"
+    "Pragma": "no-cache",
+    "Accept": "application/json"
   };
   
   const res = await fetch(url, {
@@ -23,6 +24,7 @@ export async function apiRequest(
     headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
+    mode: "same-origin"
   });
 
   await throwIfResNotOk(res);
@@ -37,10 +39,12 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(queryKey[0] as string, {
       credentials: "include",
+      mode: "same-origin",
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",
-        "Pragma": "no-cache"
+        "Pragma": "no-cache",
+        "Accept": "application/json"
       },
     });
 

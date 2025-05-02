@@ -92,9 +92,22 @@ export const insertRateLimitSchema = createInsertSchema(rateLimits).omit({
   updatedAt: true,
 });
 
+export const botTokens = pgTable("bot_tokens", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  token: text("token").notNull(),
+  isActive: boolean("is_active").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertBotTokenSchema = createInsertSchema(botTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const botSettings = pgTable("bot_settings", {
   id: serial("id").primaryKey(),
-  token: text("token"),
+  activeTokenId: integer("active_token_id"), // Reference to the currently active token
   status: text("status").notNull().default("offline"), // "online", "offline", "connecting"
   lastConnectedAt: timestamp("last_connected_at"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -123,6 +136,9 @@ export type MessageLog = typeof messageLog.$inferSelect;
 
 export type InsertRateLimit = z.infer<typeof insertRateLimitSchema>;
 export type RateLimit = typeof rateLimits.$inferSelect;
+
+export type InsertBotToken = z.infer<typeof insertBotTokenSchema>;
+export type BotToken = typeof botTokens.$inferSelect;
 
 export type InsertBotSettings = z.infer<typeof insertBotSettingsSchema>;
 export type BotSettings = typeof botSettings.$inferSelect;

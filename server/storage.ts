@@ -13,13 +13,16 @@ import {
   InsertRateLimit,
   BotSettings,
   InsertBotSettings,
+  BotToken,
+  InsertBotToken,
   users,
   discordGuilds,
   messageTemplates,
   campaigns,
   messageLog,
   rateLimits,
-  botSettings
+  botSettings,
+  botTokens
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
@@ -61,6 +64,15 @@ export interface IStorage {
   getRateLimit(): Promise<RateLimit | undefined>;
   updateRateLimit(rateLimit: InsertRateLimit): Promise<RateLimit>;
 
+  // Bot Token operations
+  getBotTokens(): Promise<BotToken[]>;
+  getBotToken(id: number): Promise<BotToken | undefined>;
+  getActiveBotToken(): Promise<BotToken | undefined>;
+  createBotToken(token: InsertBotToken): Promise<BotToken>;
+  updateBotToken(id: number, token: Partial<BotToken>): Promise<BotToken | undefined>;
+  deleteBotToken(id: number): Promise<boolean>;
+  activateBotToken(id: number): Promise<BotToken | undefined>;
+
   // Bot Settings operations
   getBotSettings(): Promise<BotSettings | undefined>;
   updateBotSettings(settings: Partial<BotSettings>): Promise<BotSettings | undefined>;
@@ -74,10 +86,12 @@ export class MemStorage implements IStorage {
   private messageLogs: MessageLog[];
   private rateLimits: RateLimit | undefined;
   private botSettings: BotSettings | undefined;
+  private botTokens: Map<number, BotToken>;
   currentUserId: number;
   currentTemplateId: number;
   currentCampaignId: number;
   currentLogId: number;
+  currentTokenId: number;
 
   constructor() {
     this.users = new Map();

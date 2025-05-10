@@ -27,6 +27,9 @@ jobs:
       run: |
         echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
         echo "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" >> .env
+        # Set CI flag for GitHub Actions environment
+        echo "CI=true" >> .env
+        echo "GITHUB_ACTIONS=true" >> .env
       
     - name: Build application
       run: npm run build
@@ -34,8 +37,29 @@ jobs:
     - name: Run linting and type checks
       run: npm run check
       
+    - name: Run database migrations (if DATABASE_URL is provided)
+      if: "${{ secrets.DATABASE_URL != '' }}"
+      run: npm run db:push
+      
+    - name: Test the application
+      run: |
+        # Start the server in the background
+        npm run start &
+        # Wait for server to start
+        sleep 5
+        # Run a simple smoke test to ensure the server is responding
+        curl -f http://localhost:3000/api/stats || exit 1
+        
     - name: Prepare for deployment
       if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
       run: |
-        # Add any deployment preparation steps here
         echo "Application built successfully and ready for deployment"
+        
+  # Add automatic deployment job here if needed
+  # deploy:
+  #   needs: build
+  #   if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Deploy to production
+  #       run: echo "Add deployment steps here"

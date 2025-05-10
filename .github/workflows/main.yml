@@ -1,0 +1,41 @@
+name: Deploy Discord Bot Manager
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Create environment file
+      run: |
+        echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
+        echo "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" >> .env
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Run linting and type checks
+      run: npm run check
+      
+    - name: Prepare for deployment
+      if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      run: |
+        # Add any deployment preparation steps here
+        echo "Application built successfully and ready for deployment"

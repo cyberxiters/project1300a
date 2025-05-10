@@ -34,9 +34,7 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
-  // PostgreSQL session store
-  const PostgresSessionStore = connectPgSimple(session);
-  
+  // Session store setup - use Postgres if available, otherwise use memory store
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "discord-bot-secret",
     resave: true,
@@ -48,11 +46,15 @@ export function setupAuth(app: Express) {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
       path: '/'
     },
-    store: new PostgresSessionStore({
-      pool,
-      tableName: "user_sessions",
-      createTableIfMissing: true,
-    })
+    store: pool 
+      ? new (connectPgSimple(session))({
+          pool,
+          tableName: "user_sessions",
+          createTableIfMissing: true,
+        })
+      : new (require('memorystore')(session))({
+          checkPeriod: 86400000 // prune expired entries every 24h
+        })
   };
 
   app.set("trust proxy", 1);

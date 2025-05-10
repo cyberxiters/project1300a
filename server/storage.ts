@@ -426,16 +426,19 @@ export class MemStorage implements IStorage {
 export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: number): Promise<User | undefined> {
+    if (!db) return undefined;
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
+    if (!db) return undefined;
     const [user] = await db.select().from(users).where(eq(users.username, username));
     return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
+    if (!db) throw new Error("Database not available");
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
@@ -832,15 +835,15 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Using the DatabaseStorage to persist data
-export const storage = new DatabaseStorage();
+// For GitHub compatibility, always use MemStorage
+export const storage = new MemStorage();
 
 // Initialize default data
 (async () => {
   try {
-    await storage.initializeDefaults();
-    console.log("Database initialized with default data");
+    // No need to call initializeDefaults since MemStorage already initializes templates
+    console.log("Memory storage initialized with default data");
   } catch (error) {
-    console.error("Error initializing database:", error);
+    console.error("Error initializing storage:", error);
   }
 })();

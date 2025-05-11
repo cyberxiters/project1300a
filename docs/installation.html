@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Installation Guide - Discord Bot Manager</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        header {
+            background-color: #5865F2;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        h1 {
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .section:last-child {
+            border-bottom: none;
+        }
+        code {
+            background-color: #f0f0f0;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: Consolas, Monaco, 'Andale Mono', monospace;
+            font-size: 14px;
+        }
+        pre {
+            background-color: #f8f8f8;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        .button {
+            background-color: #5865F2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .button.secondary {
+            background-color: #6c757d;
+        }
+        nav {
+            margin-bottom: 20px;
+        }
+        footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Discord Bot Manager</h1>
+        <p>Installation & Deployment Guide</p>
+    </header>
+
+    <nav>
+        <a href="index.html" class="button secondary">Home</a>
+        <a href="installation.html" class="button">Installation Guide</a>
+    </nav>
+
+    <div class="container">
+        <div class="section">
+            <h2>Local Installation</h2>
+            <p>Follow these steps to install and run the Discord Bot Manager locally:</p>
+            
+            <h3>Prerequisites</h3>
+            <ul>
+                <li>Node.js (version 18 or higher)</li>
+                <li>npm (comes with Node.js)</li>
+                <li>Git</li>
+            </ul>
+
+            <h3>Step 1: Clone the Repository</h3>
+            <pre><code>git clone https://github.com/cyberxiters/massdmbot.git
+cd massdmbot</code></pre>
+
+            <h3>Step 2: Install Dependencies</h3>
+            <pre><code>npm install</code></pre>
+
+            <h3>Step 3: Set Environment Variables</h3>
+            <p>Create a <code>.env</code> file in the root directory with the following content:</p>
+            <pre><code>DATABASE_URL=postgresql://username:password@localhost:5432/discord_bot
+SESSION_SECRET=your_secure_random_string</code></pre>
+            <p>Note: If you don't have a PostgreSQL database, the app will use in-memory storage.</p>
+
+            <h3>Step 4: Start the Development Server</h3>
+            <pre><code>npm run dev</code></pre>
+            <p>The application will start on <code>http://localhost:5000</code></p>
+        </div>
+
+        <div class="section">
+            <h2>Deploying to Render</h2>
+            <p>Render is a cloud platform that can host your Discord Bot Manager. Here's how to deploy:</p>
+
+            <h3>Step 1: Create a Render Account</h3>
+            <p>Sign up at <a href="https://render.com" target="_blank">render.com</a> using your GitHub account.</p>
+
+            <h3>Step 2: Create a New Web Service</h3>
+            <ul>
+                <li>Click "New" and select "Web Service"</li>
+                <li>Connect your GitHub repository</li>
+                <li>Choose the repository with your Discord Bot Manager</li>
+            </ul>
+
+            <h3>Step 3: Configure the Service</h3>
+            <p>Use these settings:</p>
+            <ul>
+                <li><strong>Name:</strong> discord-bot-manager (or your preferred name)</li>
+                <li><strong>Runtime:</strong> Node</li>
+                <li><strong>Build Command:</strong> <code>npm ci && npm run build</code></li>
+                <li><strong>Start Command:</strong> <code>npm run start</code></li>
+            </ul>
+
+            <h3>Step 4: Add Environment Variables</h3>
+            <p>Add these under the "Environment" section:</p>
+            <ul>
+                <li><strong>DATABASE_URL:</strong> Your PostgreSQL connection string (if using a database)</li>
+                <li><strong>SESSION_SECRET:</strong> A secure random string for session encryption</li>
+                <li><strong>NODE_ENV:</strong> production</li>
+            </ul>
+
+            <h3>Step 5: Deploy</h3>
+            <p>Click "Create Web Service" and Render will build and deploy your application.</p>
+            <p>Once deployed, you'll get a URL like <code>https://your-app-name.onrender.com</code></p>
+        </div>
+
+        <div class="section">
+            <h2>Setting Up Discord Bot</h2>
+            <p>To use this application, you'll need to create a Discord bot:</p>
+
+            <h3>Step 1: Create a Discord Application</h3>
+            <ul>
+                <li>Go to the <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a></li>
+                <li>Click "New Application" and give it a name</li>
+                <li>Go to the "Bot" tab and click "Add Bot"</li>
+            </ul>
+
+            <h3>Step 2: Get Bot Token</h3>
+            <ul>
+                <li>In the Bot tab, click "Reset Token" and copy your token</li>
+                <li>Add this token in the Discord Bot Manager application settings</li>
+            </ul>
+
+            <h3>Step 3: Set Permissions & Add to Server</h3>
+            <ul>
+                <li>Go to OAuth2 > URL Generator</li>
+                <li>Select "bot" scope and required permissions</li>
+                <li>Copy the generated URL and open it in your browser</li>
+                <li>Select a server to add your bot to</li>
+            </ul>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Discord Bot Manager. All rights reserved.</p>
+    </footer>
+</body>
+</html>
